@@ -44,11 +44,19 @@ func (p *Peer) HandleConnection(conn net.Conn) {
 				selfPeers, _ := json.Marshal(p.Peers)
 				responseMessage.MsgType = "askPeersInfoResponse"
 				responseMessage.MsgContent = string(selfPeers)
+				responseData, _ := json.Marshal(responseMessage)
+				//reply
+				writer := bufio.NewWriter(conn)
+				writer.Write(append(responseData, '\n'))
+				writer.Flush()
+			case "joinMessage":
+				receivedJoinPeer := new(PeerInfo)
+				json.Unmarshal([]byte(receivedMessage.MsgContent), receivedJoinPeer)
+				var receivedJoin []PeerInfo
+				receivedJoin = append(receivedJoin, *receivedJoinPeer)
+				p.recordPeers(receivedJoin)
 			}
-			responseData, _ := json.Marshal(responseMessage)
-			writer := bufio.NewWriter(conn)
-			writer.Write(append(responseData, '\n'))
-			writer.Flush()
+
 		}
 	}
 }
@@ -69,20 +77,54 @@ func (p *Peer) Connect(addr string, port int) {
 	p.Peers = append(p.Peers, PeerInfo{p.Addr, p.Port})
 	// bind local port and connect to target
 	target := addr + ":" + strconv.Itoa(port)
-	netAddr := &net.TCPAddr{Port: p.Port}
-	d := net.Dialer{LocalAddr: netAddr}
-	conn, err := d.Dial("tcp", target)
+	// netAddr := &net.TCPAddr{Port: p.Port}
+	// d := net.Dialer{LocalAddr: netAddr}
+	conn, err := net.Dial("tcp", target)
 	if err != nil {
 		// address or port invalid
 		// start its own network
 		p.log("address or port invalid, starting own network...")
-		p.Listen()
+		go p.Listen()
 		return
 	}
-	defer conn.Close()
+	// defer conn.Close()
 	p.askPeersInfo(conn)
-	// p.floodJoin(conn)
-	p.Listen()
+	conn.Close()
+	// time.Sleep(70 * time.Second)
+
+	p.floodJoin()
+	go p.Listen()
+}
+
+func (p *Peer) floodJoin() {
+	for _, selfPeerInfo := range p.Peers {
+		if p.Addr == selfPeerInfo.Addr && p.Port == selfPeerInfo.Port {
+			continue
+		}
+		target := selfPeerInfo.Addr + ":" + strconv.Itoa(selfPeerInfo.Port)
+		p.log("target: " + target)
+		// netAddr := &net.TCPAddr{Port: p.Port}
+		// d := net.Dialer{LocalAddr: netAddr}
+		conn, err := net.Dial("tcp", target)
+		if err != nil {
+			// address or port invalid
+			// start its own network
+			p.log("floodJoin falied" + err.Error())
+
+			continue
+		}
+		defer conn.Close()
+
+		joinPeerInfo := PeerInfo{p.Addr, p.Port}
+		join_data, _ := json.Marshal(joinPeerInfo)
+		joinInfoMsg := Message{"joinMessage", string(join_data)}
+
+		data, _ := json.Marshal(joinInfoMsg)
+		writer := bufio.NewWriter(conn)
+		writer.Write(append(data, '\n'))
+		writer.Flush()
+		p.log("send joinMessage")
+	}
 }
 
 func (p *Peer) log(content string) {
@@ -136,16 +178,34 @@ func (p *Peer) recordPeers(receivedPeers []PeerInfo) {
 
 func main() {
 	p1 := Peer{"127.0.0.1", 50001, []PeerInfo{}}
-	go p1.Connect("127.0.0.1", 99999)
+	p1.Connect("127.0.0.1", 99999)
 
-	time.Sleep(1 * time.Second)
+	// time.Sleep(2 * time.Second)
 
 	p2 := Peer{"127.0.0.1", 50002, []PeerInfo{}}
-	go p2.Connect("127.0.0.1", 50001)
+	p2.Connect("127.0.0.1", 50001)
 
-	time.Sleep(1 * time.Second)
+	// time.Sleep(2 * time.Second)
 
 	p3 := Peer{"127.0.0.1", 50003, []PeerInfo{}}
-	go p3.Connect("127.0.0.1", 50002)
+	p3.Connect("127.0.0.1", 50002)
+
+	p4 := Peer{"127.0.0.1", 50004, []PeerInfo{}}
+	p4.Connect("127.0.0.1", 50002)
+
+	p5 := Peer{"127.0.0.1", 50005, []PeerInfo{}}
+	p5.Connect("127.0.0.1", 50003)
+
+	p6 := Peer{"127.0.0.1", 50006, []PeerInfo{}}
+	p6.Connect("127.0.0.1", 50001)
+
+	time.Sleep(1 * time.Second)
+	p1.log("updated peers info")
+	p2.log("updated peers info")
+	p3.log("updated peers info")
+	p4.log("updated peers info")
+	p5.log("updated peers info")
+	p6.log("updated peers info")
+
 	select {}
 }
