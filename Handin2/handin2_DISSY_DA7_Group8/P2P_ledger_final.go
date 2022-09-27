@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 )
-
+// data structure
 type Transaction struct {
 	ID     string
 	From   string
@@ -59,6 +59,67 @@ type Peer struct {
 	Peers  []PeerInfo
 	ledger Ledger
 }
+// net utils
+
+func (p *Peer) Connect(addr string, port int) {
+	// adding self to peers
+	p.Peers = append(p.Peers, PeerInfo{p.Addr, p.Port})
+	// bind local port and connect to target
+	target := addr + ":" + strconv.Itoa(port)
+	// netAddr := &net.TCPAddr{Port: p.Port}
+	// d := net.Dialer{LocalAddr: netAddr}
+	conn, err := net.Dial("tcp", target)
+	if err != nil {
+		// address or port invalid
+		// start its own network
+		p.log("address or port invalid, starting own network...")
+		go p.Listen()
+		return
+	}
+	// defer conn.Close()
+	p.askPeersInfo(conn)
+	defer conn.Close()
+	p.floodJoin()
+	go p.Listen()
+}
+
+func (p *Peer) askPeersInfo(conn net.Conn) {
+	// send askPeersInfo msg to get peers set
+	// use json to marshal
+	askInfoMsg := Message{"askPeersInfo", "hello"}
+	data, _ := json.Marshal(askInfoMsg)
+	writer := bufio.NewWriter(conn)
+	writer.Write(append(data, '\n'))
+	writer.Flush()
+	p.log("send askPeersInfo msg")
+	reader := bufio.NewReader(conn)
+	msg, err := reader.ReadBytes('\n')
+	if err != nil {
+		p.log("askPeersInfo failed")
+		return
+	} else {
+		p.log("askPeersInfo success")
+		askPeersInfoResponse := new(Message)
+		json.Unmarshal(msg, askPeersInfoResponse)
+
+		var receivedPeers []PeerInfo
+		json.Unmarshal([]byte(askPeersInfoResponse.MsgContent), &receivedPeers)
+		p.recordPeers(receivedPeers)
+		p.log("updated peers info")
+	}
+}
+
+func (p *Peer) Listen() {
+	listen_port := ":" + strconv.Itoa(p.Port)
+	ln, _ := net.Listen("tcp", listen_port)
+	defer ln.Close()
+	p.log("now listening for connection...")
+	for {
+		conn, _ := ln.Accept()
+		p.log("Got a connection...")
+		go p.HandleConnection(conn)
+	}
+}
 
 func (p *Peer) FloodTransaction(tx *Transaction) {
 	p.ledger.Transact(tx)
@@ -105,41 +166,7 @@ func (p *Peer) HandleConnection(conn net.Conn) {
 		}
 	}
 }
-func (p *Peer) Listen() {
-	listen_port := ":" + strconv.Itoa(p.Port)
-	ln, _ := net.Listen("tcp", listen_port)
-	defer ln.Close()
-	p.log("now listening for connection...")
-	for {
-		conn, _ := ln.Accept()
-		p.log("Got a connection...")
-		go p.HandleConnection(conn)
-	}
-}
 
-func (p *Peer) Connect(addr string, port int) {
-	// adding self to peers
-	p.Peers = append(p.Peers, PeerInfo{p.Addr, p.Port})
-	// bind local port and connect to target
-	target := addr + ":" + strconv.Itoa(port)
-	// netAddr := &net.TCPAddr{Port: p.Port}
-	// d := net.Dialer{LocalAddr: netAddr}
-	conn, err := net.Dial("tcp", target)
-	if err != nil {
-		// address or port invalid
-		// start its own network
-		p.log("address or port invalid, starting own network...")
-		go p.Listen()
-		return
-	}
-	// defer conn.Close()
-	p.askPeersInfo(conn)
-	conn.Close()
-	// time.Sleep(70 * time.Second)
-
-	p.floodJoin()
-	go p.Listen()
-}
 
 func (p *Peer) FloodMessage(msg Message) {
 	for _, selfPeerInfo := range p.Peers {
@@ -162,47 +189,12 @@ func (p *Peer) FloodMessage(msg Message) {
 		p.log("flooding message" + msg.MsgType + msg.MsgContent)
 	}
 }
+
 func (p *Peer) floodJoin() {
 	joinPeerInfo := PeerInfo{p.Addr, p.Port}
 	join_data, _ := json.Marshal(joinPeerInfo)
 	joinInfoMsg := Message{"joinMessage", string(join_data)}
 	p.FloodMessage(joinInfoMsg)
-}
-
-func (p *Peer) log(content string) {
-	if content == "updated peers info" {
-		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.Peers)
-	} else if content == "Ledger" {
-		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.ledger.Accounts)
-	} else {
-		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content)
-	}
-}
-
-func (p *Peer) askPeersInfo(conn net.Conn) {
-	// send askPeersInfo msg to get peers set
-	// use json to marshal
-	askInfoMsg := Message{"askPeersInfo", "hello"}
-	data, _ := json.Marshal(askInfoMsg)
-	writer := bufio.NewWriter(conn)
-	writer.Write(append(data, '\n'))
-	writer.Flush()
-	p.log("send askPeersInfo msg")
-	reader := bufio.NewReader(conn)
-	msg, err := reader.ReadBytes('\n')
-	if err != nil {
-		p.log("askPeersInfo failed")
-		return
-	} else {
-		p.log("askPeersInfo success")
-		askPeersInfoResponse := new(Message)
-		json.Unmarshal(msg, askPeersInfoResponse)
-
-		var receivedPeers []PeerInfo
-		json.Unmarshal([]byte(askPeersInfoResponse.MsgContent), &receivedPeers)
-		p.recordPeers(receivedPeers)
-		p.log("updated peers info")
-	}
 }
 
 func (p *Peer) recordPeers(receivedPeers []PeerInfo) {
@@ -219,9 +211,18 @@ func (p *Peer) recordPeers(receivedPeers []PeerInfo) {
 		}
 	}
 }
+// test module
+func (p *Peer) log(content string) {
+	if content == "updated peers info" {
+		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.Peers)
+	} else if content == "Ledger" {
+		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.ledger.Accounts)
+	} else {
+		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content)
+	}
+}
 
 func (p *Peer) MakeRandomTransaction(num int) {
-
 	if num <= 0 {
 		return
 	}
@@ -237,33 +238,34 @@ func (p *Peer) MakeRandomTransaction(num int) {
 }
 
 func main() {
+
 	p1 := Peer{Addr: "127.0.0.1", Port: 50001, ledger: *MakeLedger()}
 	p1.Connect("127.0.0.1", 99999)
-	// time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
 	p2 := Peer{Addr: "127.0.0.1", Port: 50002, ledger: *MakeLedger()}
 	p2.Connect("127.0.0.1", 50001)
-	// time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
 	p3 := Peer{Addr: "127.0.0.1", Port: 50003, ledger: *MakeLedger()}
 	p3.Connect("127.0.0.1", 50002)
-	// time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
 	p4 := Peer{Addr: "127.0.0.1", Port: 50004, ledger: *MakeLedger()}
 	p4.Connect("127.0.0.1", 50002)
-	// time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
 	p5 := Peer{Addr: "127.0.0.1", Port: 50005, ledger: *MakeLedger()}
 	p5.Connect("127.0.0.1", 50003)
-	// time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
 	p6 := Peer{Addr: "127.0.0.1", Port: 50006, ledger: *MakeLedger()}
 	p6.Connect("127.0.0.1", 50001)
-
+	time.Sleep(1 * time.Second)
 	p7 := Peer{Addr: "127.0.0.1", Port: 50007, ledger: *MakeLedger()}
 	p7.Connect("127.0.0.1", 50004)
-
+	time.Sleep(1 * time.Second)
 	p8 := Peer{Addr: "127.0.0.1", Port: 50008, ledger: *MakeLedger()}
 	p8.Connect("127.0.0.1", 50005)
-
+	time.Sleep(1 * time.Second)
 	p9 := Peer{Addr: "127.0.0.1", Port: 50009, ledger: *MakeLedger()}
 	p9.Connect("127.0.0.1", 50005)
-
+	time.Sleep(1 * time.Second)
 	p10 := Peer{Addr: "127.0.0.1", Port: 50010, ledger: *MakeLedger()}
 	p10.Connect("127.0.0.1", 50007)
 
@@ -287,7 +289,7 @@ func main() {
 	go p9.MakeRandomTransaction(10)
 	go p10.MakeRandomTransaction(10)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 	p1.log("Ledger")
 	p2.log("Ledger")
 	p3.log("Ledger")
@@ -301,11 +303,3 @@ func main() {
 
 	select {}
 }
-
-// 5 account each peer
-// each peer 10 transcations  and  sends transcations at same time
-//
-// t1 := Transaction{ID: "1", From: "Account_3", To: "Account_1", Amount: 10}
-// t2 := Transaction{ID: "2", From: "Account_4", To: "Account_2", Amount: 3}
-// go p3.FloodTransaction(&t1)
-// go p5.FloodTransaction(&t2)

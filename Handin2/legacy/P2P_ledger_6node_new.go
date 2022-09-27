@@ -238,7 +238,7 @@ func main() {
 	p6.log("updated peers info")
 	
 
-	
+
 	select {}
 }
 
