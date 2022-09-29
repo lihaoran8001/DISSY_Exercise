@@ -1,9 +1,9 @@
 package RSA
 
-import(
-	"math/big"
+import (
 	"crypto/rand"
 	"crypto/sha256"
+	"math/big"
 )
 
 type PublicKey struct {
@@ -62,11 +62,11 @@ func Decrypt(ciphertext *big.Int, pk *PrivateKey) *big.Int {
 	return res
 }
 
-func Sign(plaintext *big.Int, pk *PrivateKey) *big.Int{
+func Sign(plaintext *big.Int, pk *PrivateKey) *big.Int {
 	return Decrypt(plaintext, pk)
 }
 
-func Verify(message string, signature *big.Int, pk *PublicKey) bool{
+func Verify(message string, signature *big.Int, pk *PublicKey) bool {
 	check_hash := Encrypt(signature, pk)
 	real_hash := Hash(message)
 	// fmt.Println("check_hash", check_hash)
@@ -74,12 +74,12 @@ func Verify(message string, signature *big.Int, pk *PublicKey) bool{
 	return check_hash.Cmp(real_hash) == 0
 }
 
-func Hash(message string) *big.Int{
+func Hash(message string) *big.Int {
 	bytes := HashRaw(message)
 	return big.NewInt(0).SetBytes(bytes)
 }
 
-func HashRaw(message string) []byte{
+func HashRaw(message string) []byte {
 	h := sha256.New()
 	h.Write([]byte(message))
 	return h.Sum(nil)
