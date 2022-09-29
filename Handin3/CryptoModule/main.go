@@ -77,5 +77,26 @@ func main() {
 	}
 	fmt.Println("Time used for sign with 2000bits keylen:", duration2/10)
 
-	//
+	// compre the signing time for original message and hash value
+	plain_text := randString.RandStringRunes(2500000) // 2000 bits plain text
+	
+	var startTime3 time.Time
+	var duration3 time.Duration
+	for i := 0; i < 10; i++{
+		startTime3 = time.Now()
+		hash_value := RSA.Hash(plain_text)
+		RSA.Sign(hash_value, pri)
+		duration3 += time.Since(startTime3)
+	}
+	fmt.Println("Time used for sign hash value:", duration3/10)
+
+	var startTime4 time.Time
+	var duration4 time.Duration
+	plain_text_int := big.NewInt(0).SetBytes([]byte(plain_text))
+	for i := 0; i < 10; i++{
+		startTime4 = time.Now()
+		RSA.Sign(plain_text_int, pri)
+		duration4 += time.Since(startTime4)
+	}
+	fmt.Println("Time used for sign original message:", duration4/10)
 }
