@@ -7,9 +7,15 @@ When B intercept the traffic among A and D, he gets *E<sub>pk<sub>D</sub></sub>(
 This breaks the second security policy. In this situation, B can get information about A asked for.
 
 
-> We implement all the test cases in "CryptoModule/main.go" including Exercise 5.11 and 6.10
+
 ### Exercise 5.11
-1. 
+> We implement all the test cases in "CryptoModule/main.go" including Exercise 5.11 and 6.10
+
+1. we create a pair of keys with 2000 bits length using `RSA.KeyGen` function. 
+2. Then we randomly generate a number as plaintext. 
+3. We use `RSA.Encrypt` function to encrypt it with public key. 
+4. Then we use `AES.EncryptToFile` and `AES.DecryptFromFile` to encrypt the RSA priavte key and then load and decrypt it from file. The key used for AES is randomly generated.
+5. At last, we use decrypted private key to decrypt ciphertext, and we can see that the message is same as original plaintext.
 
 ### Exercise 6.10
 1. We create 2 messages,message1 "hello world" and message2 "goodbye world", first we use `Hash()` function to get the hash value of message1 and then use `Sign()` function to get the signature of the hash value. In `Verify()` function, public key is used to decypt the signature, if this value is same as the hash value of message then it can be verified and returns *true*, otherwise, *false*.   

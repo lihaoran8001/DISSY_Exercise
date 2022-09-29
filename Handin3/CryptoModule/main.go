@@ -28,7 +28,8 @@ func main() {
 
 	// use AES to encrypt the RSA private key
 	aes_plaintext, _ := json.Marshal(pri)
-	key := "6368616e676520746869732070617373"
+
+	key := randString.RandStringNums(32)
 	// fmt.Println("AES_CTR key:", key)
 	AES.EncryptToFile("bin", aes_plaintext, key)
 
