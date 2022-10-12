@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"math/big"
+	// "fmt"
 )
 
 type PublicKey struct {
@@ -77,6 +78,11 @@ func Verify(message string, signature *big.Int, pk *PublicKey) bool {
 	// fmt.Println("check_hash", check_hash)
 	// fmt.Println("real_hash", real_hash)
 	return check_hash.Cmp(real_hash) == 0
+}
+
+func VerifyMessage(message string, signature *big.Int, pk *PublicKey) bool {
+	sigMessage := string(Encrypt(signature, pk).Bytes())
+	return sigMessage == message
 }
 
 func Hash(message string) *big.Int {

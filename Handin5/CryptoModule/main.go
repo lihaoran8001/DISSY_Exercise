@@ -2,6 +2,7 @@ package main
 
 import (
 	"CryptoModule/AES"
+	"CryptoModule/RSA"
 	"CryptoModule/randString"
 
 	// "CryptoModule/RSA"
@@ -17,8 +18,14 @@ func main() {
 	// --------- Exercise 9.11 --------------//
 	password := randString.RandStringNums(32)
 	pub := AES.Generate("911bin", password)
-	fmt.Println(pub.E)
-
-	signature := AES.Sign("911bin", password, []byte("123"))
+	message := "DISSY2022"
+	// password = "anything else"
+	signature := AES.Sign("911bin", password, []byte(message))
 	fmt.Println(signature)
+	isVerified := RSA.VerifyMessage(message, signature, pub)
+	if isVerified{
+		fmt.Println("verify success")
+	}else{
+		fmt.Println("verify fail")
+	}
 }

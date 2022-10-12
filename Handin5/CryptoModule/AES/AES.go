@@ -18,23 +18,24 @@ import (
 func Generate(filename string, password string) *RSA.PublicKey {
 	pub, pri := RSA.KeyGen(2000)
 	priBytes, _ := json.Marshal(pri)
-	fmt.Println("before", priBytes)
+	// fmt.Println("before", priBytes)
 	EncryptToFileWithHash(filename, priBytes, password)
 	return pub
 }
 
-func Sign(filename string, password string, msg []byte) (Signature []byte) {
+func Sign(filename string, password string, msg []byte) (Signature *big.Int) {
 	priKey_bytes := DecryptFromFileWithHash(filename, password)
 	if string(priKey_bytes) == string([]byte("Wrong password!")) {
-		return []byte("Wrong password!")
+		fmt.Println("Wrong password!")
+		return big.NewInt(-1)
 	}
-
+	fmt.Println("Password correct!")
 	priKey := new(RSA.PrivateKey)
-	fmt.Println("after", priKey_bytes)
+	// fmt.Println("after", priKey_bytes)
 	json.Unmarshal(priKey_bytes, priKey)
 	msg_bytes := big.NewInt(0).SetBytes(msg)
-	fmt.Println(priKey)
-	return RSA.Sign(msg_bytes, priKey).Bytes()
+	// fmt.Println(priKey)
+	return RSA.Sign(msg_bytes, priKey)
 
 }
 
@@ -51,11 +52,11 @@ func DecryptFromFileWithHash(filename string, password string) []byte {
 	fileinfo, _ := fp.Stat()
 	filesize := fileinfo.Size()
 	ciphertext := make([]byte, filesize)
-	len, _ := fp.Read(ciphertext)
+	fp.Read(ciphertext)
 
 	json.Unmarshal(ciphertext, KF)
-	fmt.Println(RSA.Hash(password))
-	fmt.Println(KF.H)
+	// fmt.Println(RSA.Hash(password))
+	// fmt.Println(KF.H)
 	if RSA.Hash(password).Cmp(KF.H) != 0 {
 		return []byte("Wrong password!")
 	}
@@ -65,7 +66,7 @@ func DecryptFromFileWithHash(filename string, password string) []byte {
 
 	// fmt.Println(ciphertext)
 	iv := KF.PriKey[:aes.BlockSize]
-	plaintext2 := make([]byte, len-aes.BlockSize)
+	plaintext2 := make([]byte, len(KF.PriKey)-aes.BlockSize)
 	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(plaintext2, KF.PriKey[aes.BlockSize:])
 	return plaintext2
