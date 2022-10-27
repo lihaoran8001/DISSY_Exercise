@@ -322,6 +322,7 @@ func (p *Peer) MakeRandomTransaction(num int) {
 		t := SignedTransaction{ID: strconv.Itoa(i), From: from, To: to, Amount: amount, Signature: Sig}
 
 		p.FloodTransaction(&t)
+		time.Sleep(1 * time.Millisecond)
 	}
 }
 
@@ -343,6 +344,7 @@ func main() {
 		// fmt.Println("KeyLength: ", len(string(prib)))
 		KeyPairMain[string(pubb)] = string(prib)
 	}
+
 	InvalidKeyPair := make(map[string]string)
 	for k, _ := range KeyPairMain {
 		// pri := randString.RandStringRunes(1200)
@@ -378,8 +380,10 @@ func main() {
 	p9 := Peer{Addr: "127.0.0.1", Port: 50009, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
 	p9.Connect("127.0.0.1", 50005)
 	time.Sleep(1 * time.Second)
-	p10 := Peer{Addr: "127.0.0.1", Port: 50010, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(InvalidKeyPair)}
+	p10 := Peer{Addr: "127.0.0.1", Port: 50010, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
 	p10.Connect("127.0.0.1", 50007)
+	p11 := Peer{Addr: "127.0.0.1", Port: 50011, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(InvalidKeyPair)}
+	p11.Connect("127.0.0.1", 50005)
 
 	// time.Sleep(1 * time.Second)
 	// p1.log("updated peers info")
@@ -389,25 +393,22 @@ func main() {
 	// p5.log("updated peers info")
 	// p6.log("updated peers info")
 
-	go p1.MakeRandomTransaction(15)
-	go p2.MakeRandomTransaction(15)
-
-	go p3.MakeRandomTransaction(15)
-	go p4.MakeRandomTransaction(15)
-	go p5.MakeRandomTransaction(15)
-	go p6.MakeRandomTransaction(15)
-	go p6.MakeRandomTransaction(15)
-	go p7.MakeRandomTransaction(15)
-	go p8.MakeRandomTransaction(15)
-	go p9.MakeRandomTransaction(15)
-	go p10.MakeRandomTransaction(2)
+	go p1.MakeRandomTransaction(10)
+	go p2.MakeRandomTransaction(10)
+	go p3.MakeRandomTransaction(10)
+	go p4.MakeRandomTransaction(10)
+	go p5.MakeRandomTransaction(10)
+	go p6.MakeRandomTransaction(10)
+	go p6.MakeRandomTransaction(10)
+	go p7.MakeRandomTransaction(10)
+	go p8.MakeRandomTransaction(10)
+	go p9.MakeRandomTransaction(10)
+	go p10.MakeRandomTransaction(10)
+	go p11.MakeRandomTransaction(2)
 
 	time.Sleep(10 * time.Second)
 	p1.log("Ledger")
-	// fmt.Print(p1.ledger.Accounts)
 	p2.log("Ledger")
-	// fmt.Print(p2.ledger.Accounts)
-
 	p3.log("Ledger")
 	p4.log("Ledger")
 	p5.log("Ledger")
@@ -416,6 +417,7 @@ func main() {
 	p8.log("Ledger")
 	p9.log("Ledger")
 	p10.log("Ledger")
+	p11.log("Ledger")
 
 	select {}
 }
