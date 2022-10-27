@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"math/big"
-	"fmt"
 )
 
 type PublicKey struct {
@@ -15,7 +14,7 @@ type PublicKey struct {
 
 type KeyFile struct {
 	PriKey []byte
-	H *big.Int
+	H      *big.Int
 }
 
 type PrivateKey struct {
@@ -82,11 +81,11 @@ func SignStr(plaintext []byte, pk string, pub string) string {
 	json.Unmarshal([]byte(pub), pubL)
 
 	// fmt.Println("SIGNATURE Bytes", plaintext)
-	fmt.Println("plainBI", plainBI)
-	SigBI := Decrypt(plainBI, pri)
-	fmt.Println("sigBI:", SigBI)
-	deBI := Encrypt(SigBI, pubL)
-	fmt.Println("deBI:", deBI)
+	// fmt.Println("plainBI", plainBI)
+	// SigBI := Decrypt(plainBI, pri)
+	// fmt.Println("sigBI:", SigBI)
+	// deBI := Encrypt(SigBI, pubL)
+	// fmt.Println("deBI:", deBI)
 	return Decrypt(plainBI, pri).String()
 }
 
@@ -98,16 +97,25 @@ func Verify(message string, signature *big.Int, pk *PublicKey) bool {
 	return check_hash.Cmp(real_hash) == 0
 }
 
-func VerifyTrans(sig string, pk string) []byte {
+// func VerifyTrans(sig string, pk string) []byte {
+// 	sigBI, _ := new(big.Int).SetString(sig, 10)
+// 	pub := new(PublicKey)
+// 	json.Unmarshal([]byte(pk), pub)
+
+// 	Body := Encrypt(sigBI, pub).Bytes()
+// 	fmt.Println("VERIFY BI", Encrypt(sigBI, pub))
+// 	fmt.Println("VERIFY Btyes", Body)
+// 	// return check_hash.Cmp(real_hash) == 0
+// 	return Body
+// }
+
+// 添加 hash string
+// kwz 改
+func VerifyTrans(hash string, sig string, pk string) bool {
 	sigBI, _ := new(big.Int).SetString(sig, 10)
 	pub := new(PublicKey)
 	json.Unmarshal([]byte(pk), pub)
-	
-	Body := Encrypt(sigBI, pub).Bytes()
-	fmt.Println("VERIFY BI", Encrypt(sigBI, pub))
-	fmt.Println("VERIFY Btyes", Body)
-	// return check_hash.Cmp(real_hash) == 0
-	return Body
+	return VerifyMessage(hash, sigBI, pub)
 }
 
 func VerifyMessage(message string, signature *big.Int, pk *PublicKey) bool {

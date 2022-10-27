@@ -1,6 +1,7 @@
 package main
 
 import (
+	"CryptoModule/RSA"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -9,8 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"CryptoModule/RSA"
 )
+
 // data structure
 type Transaction struct {
 	ID     string
@@ -19,15 +20,15 @@ type Transaction struct {
 	Amount int
 }
 
-type SignedTransaction struct{
-	ID     string
-	From   string
-	To     string
-	Amount int
+type SignedTransaction struct {
+	ID        string
+	From      string
+	To        string
+	Amount    int
 	Signature string
 }
 
-type SignedTransactionBody struct{
+type SignedTransactionBody struct {
 	ID     string
 	From   string
 	To     string
@@ -39,19 +40,23 @@ func (l *Ledger) SignedTransaction(t *SignedTransaction) {
 	defer l.lock.Unlock()
 
 	// verify signature here
+	// 1. calculate hash
+	STB := SignedTransactionBody{ID: t.ID, From: t.From, To: t.To, Amount: t.Amount}
+	STB_Bytes, _ := json.Marshal(STB)
+	HashedBody := RSA.HashRaw(string(STB_Bytes))
+	valid := RSA.VerifyTrans(string(HashedBody), t.Signature, t.From)
 
-	SigBody := RSA.VerifyTrans(t.Signature, t.From)
-	STB := new(SignedTransactionBody)
-	json.Unmarshal(SigBody, STB)
-	valid := STB.From == t.From
-	fmt.Println("STB", STB)
-	if valid{
+	// SigBody := RSA.VerifyTrans(t.Signature, t.From)
+	// STB := new(SignedTransactionBody)
+	// json.Unmarshal(SigBody, STB)
+	// valid := STB.From == t.From
+	// fmt.Println("STB", STB)
+	if valid {
 		fmt.Println("!!!!!")
 		l.Accounts[t.From] -= t.Amount
 		l.Accounts[t.To] += t.Amount
 	}
 }
-
 
 type Ledger struct {
 	Accounts map[string]int
@@ -87,12 +92,13 @@ type PeerInfo struct {
 }
 
 type Peer struct {
-	Addr   string
-	Port   int
-	Peers  []PeerInfo
-	ledger Ledger
+	Addr     string
+	Port     int
+	Peers    []PeerInfo
+	ledger   Ledger
 	KeyPairs map[string]string
 }
+
 // net utils
 
 func (p *Peer) Connect(addr string, port int) {
@@ -159,10 +165,10 @@ func (p *Peer) FloodTransaction(tx *SignedTransaction) {
 	// update locally
 	// p.ledger.Transact(tx)
 	p.ledger.SignedTransaction(tx)
-	
-	// tx_content, _ := json.Marshal(*tx)
-	// TxMsg := Message{"Transaction", string(tx_content)}
-	// p.FloodMessage(TxMsg)
+
+	tx_content, _ := json.Marshal(*tx)
+	TxMsg := Message{"Transaction", string(tx_content)}
+	p.FloodMessage(TxMsg)
 }
 
 func (p *Peer) HandleConnection(conn net.Conn) {
@@ -208,7 +214,6 @@ func (p *Peer) HandleConnection(conn net.Conn) {
 	}
 }
 
-
 func (p *Peer) FloodMessage(msg Message) {
 	for _, selfPeerInfo := range p.Peers {
 		if p.Addr == selfPeerInfo.Addr && p.Port == selfPeerInfo.Port {
@@ -252,12 +257,16 @@ func (p *Peer) recordPeers(receivedPeers []PeerInfo) {
 		}
 	}
 }
+
 // test module
 func (p *Peer) log(content string) {
 	if content == "updated peers info" {
 		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.Peers)
 	} else if content == "Ledger" {
 		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.ledger.Accounts)
+		for k, v := range p.ledger.Accounts {
+			fmt.Println(k, v)
+		}
 	} else {
 		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content)
 	}
@@ -270,13 +279,14 @@ func (p *Peer) MakeRandomTransaction(num int) {
 	// store pubkey into array for random access
 	var pubs []string
 	// var pris []string
-	for pub, _  := range p.KeyPairs {
+	for pub, _ := range p.KeyPairs {
 		pubs = append(pubs, pub)
 		// pris = append(pris, pri)
 	}
 
-	rand.Seed(time.Now().Unix())
+	// rand.Seed(time.Now().Unix())
 	for i := 0; i < num; i++ {
+		rand.Seed(time.Now().Unix())
 		from := pubs[rand.Intn(5)]
 		to := pubs[rand.Intn(5)]
 		amount := rand.Intn(100)
@@ -289,15 +299,17 @@ func (p *Peer) MakeRandomTransaction(num int) {
 		//
 		//
 		//
-		Sig := RSA.SignStr(Body, pri, from)
+		HashedBody := RSA.HashRaw(string(Body))
+
+		Sig := RSA.SignStr(HashedBody, pri, from)
 		// construct signed transaction
 		t := SignedTransaction{ID: strconv.Itoa(i), From: from, To: to, Amount: amount, Signature: Sig}
-		
+
 		p.FloodTransaction(&t)
 	}
 }
 
-func CopyKeyPair(kp map[string]string) map[string]string{
+func CopyKeyPair(kp map[string]string) map[string]string {
 	res := make(map[string]string)
 	for key, value := range kp {
 		res[key] = value
@@ -308,7 +320,7 @@ func CopyKeyPair(kp map[string]string) map[string]string{
 func main() {
 	// create key pairs for 5 accounts
 	KeyPairMain := make(map[string]string)
-	for i := 0; i < 5; i++{
+	for i := 0; i < 5; i++ {
 		pub, pri := RSA.KeyGen(2000)
 		pubb, _ := json.Marshal(pub)
 		prib, _ := json.Marshal(pri)
@@ -318,8 +330,8 @@ func main() {
 	p1 := Peer{Addr: "127.0.0.1", Port: 50001, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
 	p1.Connect("127.0.0.1", 99999)
 	// time.Sleep(1 * time.Second)
-	// p2 := Peer{Addr: "127.0.0.1", Port: 50002, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
-	// p2.Connect("127.0.0.1", 50001)
+	p2 := Peer{Addr: "127.0.0.1", Port: 50002, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p2.Connect("127.0.0.1", 50001)
 	// time.Sleep(1 * time.Second)
 	// p3 := Peer{Addr: "127.0.0.1", Port: 50003, ledger: *MakeLedger()}
 	// p3.Connect("127.0.0.1", 50002)
@@ -353,8 +365,9 @@ func main() {
 	// p5.log("updated peers info")
 	// p6.log("updated peers info")
 
-	go p1.MakeRandomTransaction(1)
-	// go p2.MakeRandomTransaction(10)
+	go p1.MakeRandomTransaction(2)
+	go p2.MakeRandomTransaction(2)
+
 	// go p3.MakeRandomTransaction(10)
 	// go p4.MakeRandomTransaction(10)
 	// go p5.MakeRandomTransaction(10)
@@ -365,9 +378,12 @@ func main() {
 	// go p9.MakeRandomTransaction(10)
 	// go p10.MakeRandomTransaction(10)
 
-	// time.Sleep(3 * time.Second)
-	p1.log("Ledger")
-	// p2.log("Ledger")
+	time.Sleep(10 * time.Second)
+	p1.log("P1: Ledger")
+	fmt.Print(p1.ledger.Accounts)
+	p2.log("P2: Ledger")
+	fmt.Print(p2.ledger.Accounts)
+
 	// p3.log("Ledger")
 	// p4.log("Ledger")
 	// p5.log("Ledger")
