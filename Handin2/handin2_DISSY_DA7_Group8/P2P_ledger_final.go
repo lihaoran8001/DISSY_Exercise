@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 )
+
 // data structure
 type Transaction struct {
 	ID     string
@@ -59,6 +60,7 @@ type Peer struct {
 	Peers  []PeerInfo
 	ledger Ledger
 }
+
 // net utils
 
 func (p *Peer) Connect(addr string, port int) {
@@ -167,7 +169,6 @@ func (p *Peer) HandleConnection(conn net.Conn) {
 	}
 }
 
-
 func (p *Peer) FloodMessage(msg Message) {
 	for _, selfPeerInfo := range p.Peers {
 		if p.Addr == selfPeerInfo.Addr && p.Port == selfPeerInfo.Port {
@@ -211,6 +212,7 @@ func (p *Peer) recordPeers(receivedPeers []PeerInfo) {
 		}
 	}
 }
+
 // test module
 func (p *Peer) log(content string) {
 	if content == "updated peers info" {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -52,9 +53,11 @@ func (l *Ledger) SignedTransaction(t *SignedTransaction) {
 	// valid := STB.From == t.From
 	// fmt.Println("STB", STB)
 	if valid {
-		fmt.Println("!!!!!")
+		// fmt.Println("!!!!!")
 		l.Accounts[t.From] -= t.Amount
 		l.Accounts[t.To] += t.Amount
+	} else {
+		fmt.Println("Invalid Transcation from ACC", (int)(RSA.HashRaw(t.From)[0]), " to ACC", (int)(RSA.HashRaw(t.To)[0]))
 	}
 }
 
@@ -263,12 +266,25 @@ func (p *Peer) log(content string) {
 	if content == "updated peers info" {
 		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.Peers)
 	} else if content == "Ledger" {
-		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content, " ", p.ledger.Accounts)
+		fmt.Print("IP:", p.Addr, "port:", p.Port, ": ", content, " ")
+
+		mp := make(map[int]int)
+		var l []int
 		for k, v := range p.ledger.Accounts {
-			fmt.Println(k, v)
+			name := RSA.HashRaw(k)
+
+			mp[(int)(name[0])] = v
+			l = append(l, (int)(name[0]))
+			// fmt.Print("Acc", name[0], " Amt:", v, " ")
 		}
+		sort.Ints(l)
+		for acc := range l {
+			fmt.Print("Acc", l[acc], " Amt:", mp[l[acc]], "; ")
+		}
+
+		fmt.Println()
 	} else {
-		fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content)
+		// fmt.Println("IP:", p.Addr, "port:", p.Port, ": ", content)
 	}
 }
 
@@ -284,9 +300,9 @@ func (p *Peer) MakeRandomTransaction(num int) {
 		// pris = append(pris, pri)
 	}
 
-	// rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < num; i++ {
-		rand.Seed(time.Now().Unix())
+
 		from := pubs[rand.Intn(5)]
 		to := pubs[rand.Intn(5)]
 		amount := rand.Intn(100)
@@ -324,7 +340,15 @@ func main() {
 		pub, pri := RSA.KeyGen(2000)
 		pubb, _ := json.Marshal(pub)
 		prib, _ := json.Marshal(pri)
+		// fmt.Println("KeyLength: ", len(string(prib)))
 		KeyPairMain[string(pubb)] = string(prib)
+	}
+	InvalidKeyPair := make(map[string]string)
+	for k, _ := range KeyPairMain {
+		// pri := randString.RandStringRunes(1200)
+		_, pri := RSA.KeyGen(2000)
+		prib, _ := json.Marshal(pri)
+		InvalidKeyPair[k] = string(prib)
 	}
 
 	p1 := Peer{Addr: "127.0.0.1", Port: 50001, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
@@ -332,30 +356,30 @@ func main() {
 	// time.Sleep(1 * time.Second)
 	p2 := Peer{Addr: "127.0.0.1", Port: 50002, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
 	p2.Connect("127.0.0.1", 50001)
-	// time.Sleep(1 * time.Second)
-	// p3 := Peer{Addr: "127.0.0.1", Port: 50003, ledger: *MakeLedger()}
-	// p3.Connect("127.0.0.1", 50002)
-	// time.Sleep(1 * time.Second)
-	// p4 := Peer{Addr: "127.0.0.1", Port: 50004, ledger: *MakeLedger()}
-	// p4.Connect("127.0.0.1", 50002)
-	// time.Sleep(1 * time.Second)
-	// p5 := Peer{Addr: "127.0.0.1", Port: 50005, ledger: *MakeLedger()}
-	// p5.Connect("127.0.0.1", 50003)
-	// time.Sleep(1 * time.Second)
-	// p6 := Peer{Addr: "127.0.0.1", Port: 50006, ledger: *MakeLedger()}
-	// p6.Connect("127.0.0.1", 50001)
-	// time.Sleep(1 * time.Second)
-	// p7 := Peer{Addr: "127.0.0.1", Port: 50007, ledger: *MakeLedger()}
-	// p7.Connect("127.0.0.1", 50004)
-	// time.Sleep(1 * time.Second)
-	// p8 := Peer{Addr: "127.0.0.1", Port: 50008, ledger: *MakeLedger()}
-	// p8.Connect("127.0.0.1", 50005)
-	// time.Sleep(1 * time.Second)
-	// p9 := Peer{Addr: "127.0.0.1", Port: 50009, ledger: *MakeLedger()}
-	// p9.Connect("127.0.0.1", 50005)
-	// time.Sleep(1 * time.Second)
-	// p10 := Peer{Addr: "127.0.0.1", Port: 50010, ledger: *MakeLedger()}
-	// p10.Connect("127.0.0.1", 50007)
+	time.Sleep(1 * time.Second)
+	p3 := Peer{Addr: "127.0.0.1", Port: 50003, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p3.Connect("127.0.0.1", 50002)
+	time.Sleep(1 * time.Second)
+	p4 := Peer{Addr: "127.0.0.1", Port: 50004, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p4.Connect("127.0.0.1", 50002)
+	time.Sleep(1 * time.Second)
+	p5 := Peer{Addr: "127.0.0.1", Port: 50005, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p5.Connect("127.0.0.1", 50003)
+	time.Sleep(1 * time.Second)
+	p6 := Peer{Addr: "127.0.0.1", Port: 50006, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p6.Connect("127.0.0.1", 50001)
+	time.Sleep(1 * time.Second)
+	p7 := Peer{Addr: "127.0.0.1", Port: 50007, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p7.Connect("127.0.0.1", 50004)
+	time.Sleep(1 * time.Second)
+	p8 := Peer{Addr: "127.0.0.1", Port: 50008, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p8.Connect("127.0.0.1", 50005)
+	time.Sleep(1 * time.Second)
+	p9 := Peer{Addr: "127.0.0.1", Port: 50009, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(KeyPairMain)}
+	p9.Connect("127.0.0.1", 50005)
+	time.Sleep(1 * time.Second)
+	p10 := Peer{Addr: "127.0.0.1", Port: 50010, ledger: *MakeLedger(KeyPairMain), KeyPairs: CopyKeyPair(InvalidKeyPair)}
+	p10.Connect("127.0.0.1", 50007)
 
 	// time.Sleep(1 * time.Second)
 	// p1.log("updated peers info")
@@ -365,33 +389,33 @@ func main() {
 	// p5.log("updated peers info")
 	// p6.log("updated peers info")
 
-	go p1.MakeRandomTransaction(2)
-	go p2.MakeRandomTransaction(2)
+	go p1.MakeRandomTransaction(15)
+	go p2.MakeRandomTransaction(15)
 
-	// go p3.MakeRandomTransaction(10)
-	// go p4.MakeRandomTransaction(10)
-	// go p5.MakeRandomTransaction(10)
-	// go p6.MakeRandomTransaction(10)
-	// go p6.MakeRandomTransaction(10)
-	// go p7.MakeRandomTransaction(10)
-	// go p8.MakeRandomTransaction(10)
-	// go p9.MakeRandomTransaction(10)
-	// go p10.MakeRandomTransaction(10)
+	go p3.MakeRandomTransaction(15)
+	go p4.MakeRandomTransaction(15)
+	go p5.MakeRandomTransaction(15)
+	go p6.MakeRandomTransaction(15)
+	go p6.MakeRandomTransaction(15)
+	go p7.MakeRandomTransaction(15)
+	go p8.MakeRandomTransaction(15)
+	go p9.MakeRandomTransaction(15)
+	go p10.MakeRandomTransaction(2)
 
 	time.Sleep(10 * time.Second)
-	p1.log("P1: Ledger")
-	fmt.Print(p1.ledger.Accounts)
-	p2.log("P2: Ledger")
-	fmt.Print(p2.ledger.Accounts)
+	p1.log("Ledger")
+	// fmt.Print(p1.ledger.Accounts)
+	p2.log("Ledger")
+	// fmt.Print(p2.ledger.Accounts)
 
-	// p3.log("Ledger")
-	// p4.log("Ledger")
-	// p5.log("Ledger")
-	// p6.log("Ledger")
-	// p7.log("Ledger")
-	// p8.log("Ledger")
-	// p9.log("Ledger")
-	// p10.log("Ledger")
+	p3.log("Ledger")
+	p4.log("Ledger")
+	p5.log("Ledger")
+	p6.log("Ledger")
+	p7.log("Ledger")
+	p8.log("Ledger")
+	p9.log("Ledger")
+	p10.log("Ledger")
 
 	select {}
 }
